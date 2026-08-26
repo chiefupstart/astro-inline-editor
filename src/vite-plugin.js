@@ -18,6 +18,18 @@ export function inlineEditorVitePlugin(options = {}) {
     return excludeRoots.some((root) => pathname.startsWith(root));
   }
 
+  /** Only hook full page HTML navigations — not Vite/Astro asset requests. */
+  function isPageNavigation(req, pathname) {
+    if (req.method !== "GET") return false;
+    if (isExcluded(pathname)) return false;
+    if (/^\/(@|node_modules|__vite|_astro)\b/.test(pathname)) return false;
+    if (pathname.startsWith("/src/") && !pathname.endsWith(".html")) return false;
+    const accept = req.headers.accept || "";
+    if (accept.includes("text/html")) return true;
+    if (pathname.endsWith(".html")) return true;
+    return false;
+  }
+
   function resolvePageSource(root, pathname) {
     const pagesDir = path.join(root, "src", "pages");
     let p = pathname.replace(/^\/+/, "").replace(/\/+$/, "");
@@ -123,6 +135,8 @@ export function inlineEditorVitePlugin(options = {}) {
 
             fs.writeFileSync(resolved, patched, "utf-8");
             server.config.logger.info(`[astro-inline-editor] saved ${edits.length} edit(s) to ${file}`);
+            // One clean reload from Vite (avoids racing client reload + JSON HMR).
+            if (server.ws) server.ws.send({ type: "full-reload" });
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true }));
           } catch (e) {
@@ -135,7 +149,7 @@ export function inlineEditorVitePlugin(options = {}) {
       // --- Response injection ----------------------------------------------
       server.middlewares.use((req, res, next) => {
         const pathname = (req.url || "").split("?")[0];
-        if (req.method !== "GET" || isExcluded(pathname)) return next();
+        if (!isPageNavigation(req, pathname)) return next();
 
         const publicFile = path.join(publicDir, pathname.replace(/^\/+/, ""));
         const isStaticHtml = pathname.endsWith(".html") && fs.existsSync(publicFile);

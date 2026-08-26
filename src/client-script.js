@@ -45,6 +45,7 @@ export function clientScript({ file, hash, fieldCount }) {
   }
 
   function syncStatus() {
+    window.__astro_inline_editor_dirty = dirty.size > 0;
     emit('status', { message: statusMessage(), editing: editing, dirty: dirty.size, file: FILE });
   }
 
@@ -81,6 +82,7 @@ export function clientScript({ file, hash, fieldCount }) {
   function exitEdit(reload) {
     editing = false;
     window.__astro_inline_editor_editing = false;
+    window.__astro_inline_editor_dirty = false;
     nodes().forEach(function (el) {
       el.removeAttribute('contenteditable');
       el.classList.remove('__ie_on', '__ie_dirty');
@@ -116,7 +118,7 @@ export function clientScript({ file, hash, fieldCount }) {
           return;
         }
         emit('status', { message: 'Saved — reloading…', editing: false, dirty: 0, file: FILE });
-        setTimeout(function () { location.reload(); }, 400);
+        // Vite full-reload is triggered server-side after save.
       })
       .catch(function (err) {
         emit('status', { message: 'Save failed', editing: true, dirty: dirty.size, file: FILE, error: err.message });
