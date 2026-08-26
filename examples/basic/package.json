@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "astro": "^7.2.7",
-    "astro-inline-editor": "file:../.."
+    "@heyupstart/astro-inline-editor": "file:../.."
   }
 }

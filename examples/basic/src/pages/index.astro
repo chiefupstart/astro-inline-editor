@@ -1,6 +1,6 @@
 ---
 import fs from "node:fs";
-import { parseMdDocument, parseBodySections, contentEdit } from "astro-inline-editor";
+import { parseMdDocument, parseBodySections, contentEdit } from "@heyupstart/astro-inline-editor";
 import { packageReadmePath, packageReadmeFile } from "../../readme-path.mjs";
 
 const raw = fs.readFileSync(packageReadmePath, "utf-8");

@@ -1,5 +1,5 @@
 import { defineConfig } from "astro/config";
-import inlineEditor from "astro-inline-editor";
+import inlineEditor from "@heyupstart/astro-inline-editor";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 

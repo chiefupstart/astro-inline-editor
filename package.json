@@ -1,9 +1,20 @@
 {
-  "name": "astro-inline-editor",
+  "name": "@heyupstart/astro-inline-editor",
   "version": "0.1.0",
   "description": "Dev-only inline content editor for Astro — edit tagged copy in the browser, save straight to JSON or static HTML.",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chiefupstart/astro-inline-editor.git"
+  },
+  "homepage": "https://github.com/chiefupstart/astro-inline-editor#readme",
+  "bugs": {
+    "url": "https://github.com/chiefupstart/astro-inline-editor/issues"
+  },
   "exports": {
     ".": "./src/index.js",
     "./content-edit": "./src/content-edit.js",

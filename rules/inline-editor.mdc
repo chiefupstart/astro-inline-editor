@@ -23,7 +23,7 @@ When creating an editable page:
 1. Create JSON: `src/data/<area>/<slug>.json` with `meta`, `hero`, sections, etc.
 2. Create/refactor `.astro` to `import content from "..."` and render layout
 3. Define `const CONTENT_FILE = "src/data/.../file.json"`
-4. Import `contentEdit` from `astro-inline-editor` (or `astro-inline-editor/content-edit`)
+4. Import `contentEdit` from `@heyupstart/astro-inline-editor` (or `@heyupstart/astro-inline-editor/content-edit`)
 5. Helper: `const edit = (p, html) => contentEdit(CONTENT_FILE, p, html)`
 6. Wire every editable string: `{...edit("hero.title")}` on the element
 7. HTML with links/bold: `{...edit("path", true)}` + `set:html={value}`
@@ -48,7 +48,7 @@ When creating an editable page:
 ```astro
 ---
 import content from "../../data/pages/about.json";
-import { contentEdit } from "astro-inline-editor";
+import { contentEdit } from "@heyupstart/astro-inline-editor";
 
 const FILE = "src/data/pages/about.json";
 const edit = (path, html = false) => contentEdit(FILE, path, html);
@@ -61,7 +61,7 @@ const edit = (path, html = false) => contentEdit(FILE, path, html);
 ## Config (astro.config)
 
 ```js
-import inlineEditor from "astro-inline-editor";
+import inlineEditor from "@heyupstart/astro-inline-editor";
 
 export default defineConfig({
   integrations: [

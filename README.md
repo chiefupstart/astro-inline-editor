@@ -55,7 +55,7 @@ Once you're running locally:
 ## Install
 
 ```bash
-npm install astro-inline-editor
+npm install @heyupstart/astro-inline-editor
 ```
 
 ## Setup
@@ -63,7 +63,7 @@ npm install astro-inline-editor
 ```js
 // astro.config.mjs
 import { defineConfig } from "astro/config";
-import inlineEditor from "astro-inline-editor";
+import inlineEditor from "@heyupstart/astro-inline-editor";
 
 export default defineConfig({
   integrations: [
@@ -82,7 +82,7 @@ You don't need to wire this up by hand. This package ships rules so Cursor, Clau
 
 ```bash
 mkdir -p .cursor/rules
-cp node_modules/astro-inline-editor/rules/inline-editor.mdc .cursor/rules/
+cp node_modules/@heyupstart/astro-inline-editor/rules/inline-editor.mdc .cursor/rules/
 ```
 
 For Claude Code and other agents, see `rules/AGENTS.md` in the package. **Skills** (step-by-step setup and migration guides for Cursor and Claude) are on the roadmap — the rules file is the starting point today.
@@ -103,7 +103,7 @@ Edits auto-save on blur. Stay in edit mode until you toggle the toolbar app off.
 ```astro
 ---
 import content from "../data/pages/about.json";
-import { contentEdit } from "astro-inline-editor";
+import { contentEdit } from "@heyupstart/astro-inline-editor";
 
 const FILE = "src/data/pages/about.json";
 const edit = (path, html = false) => contentEdit(FILE, path, html);

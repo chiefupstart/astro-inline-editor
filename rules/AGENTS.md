@@ -6,7 +6,7 @@ Use when creating or editing pages that support the dev inline editor.
 
 - Copy → JSON under `src/data/`
 - Layout → `.astro` (icons, images, structure)
-- Editable → opt-in via `contentEdit(file, path)` from `astro-inline-editor`
+- Editable → opt-in via `contentEdit(file, path)` from `@heyupstart/astro-inline-editor`
 - No route registry; tagged fields activate the editor automatically in dev
 
 ## New editable page
