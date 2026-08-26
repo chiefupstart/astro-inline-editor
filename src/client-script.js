@@ -1,5 +1,5 @@
-// Injected into editable pages in dev. Floating bar is always visible; Astro dev
-// toolbar app stays in sync via shared window events.
+// Injected into editable pages in dev. Edit mode is controlled via the Astro dev toolbar.
+// Changes auto-save when the user leaves an editable field.
 
 const EVENT = "astro-inline-editor";
 
@@ -8,28 +8,12 @@ export function clientScript({ file, hash, fieldCount }) {
 
   return `
 <style>
-  #__ie_bar { position: fixed; bottom: 18px; right: 18px; z-index: 999999;
-    font: 13px -apple-system, Segoe UI, Arial, sans-serif; background: #262130;
-    color: #fff; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.28);
-    padding: 10px 12px; display: flex; gap: 8px; align-items: center; }
-  #__ie_bar button { font: inherit; border: none; border-radius: 6px; padding: 7px 12px;
-    cursor: pointer; font-weight: 600; }
-  #__ie_bar .primary { background: #6B4C8A; color: #fff; }
-  #__ie_bar .ghost { background: transparent; color: #cfc6db; }
-  #__ie_bar .ghost:hover { color: #fff; }
-  #__ie_status { color: #b9abcb; font-size: 12px; padding: 0 4px; max-width: 14rem; }
   [data-edit-id].__ie_on { outline: 1.5px dashed #B08BD1; outline-offset: 3px;
     border-radius: 2px; cursor: text; }
   [data-edit-id].__ie_on:hover { outline-color: #6B4C8A; background: rgba(107,76,138,0.06); }
   [data-edit-id].__ie_on:focus { outline: 1.5px solid #6B4C8A; background: rgba(107,76,138,0.10); }
   [data-edit-id].__ie_dirty { outline-style: solid; }
 </style>
-<div id="__ie_bar">
-  <span id="__ie_status"></span>
-  <button id="__ie_toggle" class="primary">Edit content</button>
-  <button id="__ie_save" class="primary" style="display:none">Save</button>
-  <button id="__ie_cancel" class="ghost" style="display:none">Cancel</button>
-</div>
 <script>
 (function () {
   var FILE = ${JSON.stringify(file)};
@@ -37,14 +21,13 @@ export function clientScript({ file, hash, fieldCount }) {
   var FIELD_COUNT = ${fieldCount};
   var EVENT = ${JSON.stringify(EVENT)};
   var editing = false;
+  var saving = false;
+  var pendingSave = false;
+  var pendingExit = false;
+  var saveTimer = null;
   var originals = new Map();
   var dirty = new Map();
-
-  var bar = document.getElementById('__ie_bar');
-  var statusEl = document.getElementById('__ie_status');
-  var toggleBtn = document.getElementById('__ie_toggle');
-  var saveBtn = document.getElementById('__ie_save');
-  var cancelBtn = document.getElementById('__ie_cancel');
+  var guardedParents = [];
 
   function publishState() {
     window.__astro_inline_editor = {
@@ -76,17 +59,15 @@ export function clientScript({ file, hash, fieldCount }) {
 
   function statusMessage() {
     if (!editing) return '';
+    if (saving) return 'Saving…';
     if (dirty.size) return dirty.size + ' unsaved change' + (dirty.size === 1 ? '' : 's');
-    return 'Click any dashed field to edit';
+    return '';
   }
 
-  function syncBar() {
+  function syncState() {
     publishState();
-    statusEl.textContent = statusMessage();
-    toggleBtn.style.display = editing ? 'none' : '';
-    saveBtn.style.display = editing ? '' : 'none';
-    cancelBtn.style.display = editing ? '' : 'none';
-    emit('status', { message: statusMessage() || (FIELD_COUNT + ' editable fields'), editing: editing, dirty: dirty.size, file: FILE });
+    var msg = statusMessage();
+    emit('status', { message: msg, editing: editing, dirty: dirty.size, file: FILE });
   }
 
   function onInput(e) {
@@ -100,7 +81,42 @@ export function clientScript({ file, hash, fieldCount }) {
       dirty.delete(id);
       el.classList.remove('__ie_dirty');
     }
-    syncBar();
+    syncState();
+  }
+
+  function onBlur() {
+    if (!dirty.size) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      saveTimer = null;
+      saveEdits();
+    }, 300);
+  }
+
+  function blockParentActivation(e) {
+    if (!editing) return;
+    var inField = e.target.closest('[data-edit-id][contenteditable="true"]');
+    // Let mousedown reach editable labels so they can receive focus.
+    if (e.type === 'mousedown' && inField) return;
+    e.preventDefault();
+  }
+
+  function guardInteractiveParents(el) {
+    var parent = el.closest('a, button');
+    if (!parent || parent.__ie_guarded) return;
+    parent.__ie_guarded = true;
+    parent.addEventListener('click', blockParentActivation, true);
+    parent.addEventListener('mousedown', blockParentActivation, true);
+    guardedParents.push(parent);
+  }
+
+  function unguardInteractiveParents() {
+    guardedParents.forEach(function (parent) {
+      parent.removeEventListener('click', blockParentActivation, true);
+      parent.removeEventListener('mousedown', blockParentActivation, true);
+      delete parent.__ie_guarded;
+    });
+    guardedParents = [];
   }
 
   function enterEdit() {
@@ -114,42 +130,59 @@ export function clientScript({ file, hash, fieldCount }) {
       el.classList.add('__ie_on');
       el.addEventListener('paste', stripFormattingPaste);
       el.addEventListener('input', onInput);
+      el.addEventListener('blur', onBlur);
+      guardInteractiveParents(el);
     });
-    syncBar();
+    syncState();
   }
 
   function exitEdit(reload) {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     editing = false;
+    unguardInteractiveParents();
     nodes().forEach(function (el) {
       el.removeAttribute('contenteditable');
       el.classList.remove('__ie_on', '__ie_dirty');
       el.removeEventListener('paste', stripFormattingPaste);
       el.removeEventListener('input', onInput);
+      el.removeEventListener('blur', onBlur);
     });
     if (reload) location.reload();
-    else syncBar();
+    else syncState();
   }
 
-  function commitSaved(newHash) {
+  function applySaved(newHash) {
     if (newHash) BASE_HASH = newHash;
     nodes().forEach(function (el) {
       originals.set(el.getAttribute('data-edit-id'), currentValue(el));
+      el.classList.remove('__ie_dirty');
     });
     dirty.clear();
-    exitEdit(false);
-    statusEl.textContent = 'Saved ✓';
-    emit('status', { message: 'Saved ✓', editing: false, dirty: 0, file: FILE });
+    syncState();
   }
 
-  function saveEdits() {
-    if (!dirty.size) { exitEdit(false); return; }
-    statusEl.textContent = 'Saving…';
-    saveBtn.disabled = true;
+  function saveEdits(opts) {
+    opts = opts || {};
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+
+    if (!dirty.size) {
+      if (opts.exitAfter) exitEdit(false);
+      return;
+    }
+    if (saving) {
+      pendingSave = true;
+      if (opts.exitAfter) pendingExit = true;
+      return;
+    }
+
+    saving = true;
+    syncState();
     var edits = [];
     dirty.forEach(function (text, id) {
       var el = document.querySelector('[data-edit-id="' + CSS.escape(id) + '"]');
       edits.push({ id: id, text: text, path: el ? el.getAttribute('data-edit-path') : undefined });
     });
+
     fetch('/__editor/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -157,38 +190,47 @@ export function clientScript({ file, hash, fieldCount }) {
     })
       .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
       .then(function (res) {
-        saveBtn.disabled = false;
+        saving = false;
         if (!res.ok) {
           alert('Save failed: ' + (res.body && res.body.message ? res.body.message : 'unknown error'));
-          syncBar();
+          syncState();
           return;
         }
         if (res.body.reload) {
-          statusEl.textContent = 'Saved — reloading…';
           setTimeout(function () { location.reload(); }, 200);
           return;
         }
-        commitSaved(res.body.hash);
+        applySaved(res.body.hash);
+
+        if (pendingSave) {
+          pendingSave = false;
+          var exit = pendingExit;
+          pendingExit = false;
+          saveEdits({ exitAfter: exit });
+          return;
+        }
+        if (opts.exitAfter || pendingExit) {
+          pendingExit = false;
+          exitEdit(false);
+        }
       })
       .catch(function (err) {
-        saveBtn.disabled = false;
+        saving = false;
+        pendingSave = false;
+        pendingExit = false;
         alert('Save failed: ' + err.message);
-        syncBar();
+        syncState();
       });
   }
 
-  toggleBtn.addEventListener('click', enterEdit);
-  saveBtn.addEventListener('click', saveEdits);
-  cancelBtn.addEventListener('click', function () { exitEdit(true); });
-
   window.addEventListener(EVENT + ':enter', enterEdit);
-  window.addEventListener(EVENT + ':save', saveEdits);
-  window.addEventListener(EVENT + ':exit', function () { exitEdit(false); });
+  window.addEventListener(EVENT + ':save', function () { saveEdits(); });
+  window.addEventListener(EVENT + ':done', function () { saveEdits({ exitAfter: true }); });
   window.addEventListener(EVENT + ':cancel', function () { exitEdit(true); });
 
   publishState();
   emit('ready', { file: FILE, fieldCount: FIELD_COUNT });
-  syncBar();
+  syncState();
 })();
 </` + `script>
 `;

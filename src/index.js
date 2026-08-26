@@ -6,6 +6,7 @@ import { inlineEditorVitePlugin } from "./vite-plugin.js";
  * @param {object} [options]
  * @param {string[]} [options.excludeRoots] URL prefixes to skip (e.g. `/admin`)
  * @param {string} [options.dataDir] Root for JSON content files (default: `src/data`)
+ * @param {string} [options.contentDir] Root for Markdown content files (default: `src/content`)
  * @returns {AstroIntegration}
  */
 export default function inlineEditor(options = {}) {
@@ -38,4 +39,5 @@ export default function inlineEditor(options = {}) {
 }
 
 export { contentEdit } from "./content-edit.js";
-export { inlineEditorVitePlugin } from "./vite-plugin.js";
+export { parseMdDocument, serializeMdDocument, parseBodySections, serializeBodySections, applyMdEdits, hashOf as mdHashOf } from "./editor-core-md.js";
+export { inlineEditorVitePlugin, setupInlineEditorMiddleware } from "./vite-plugin.js";

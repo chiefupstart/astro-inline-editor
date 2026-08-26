@@ -1,10 +1,78 @@
 {
   "meta": {
-    "title": "Example | astro-inline-editor",
-    "description": "Minimal example page for the inline editor."
+    "title": "Riverdale Community Center | Impact Story Demo",
+    "description": "Demo impact story page for astro-inline-editor."
   },
   "hero": {
-    "title": "Hello, Inline Editor Jeff Here X",
-    "intro": "Click Edit content in the Astro dev toolbar, then edit this text."
+    "title": "Riverdale Community Center: From Bulletin Board to Every Pocket",
+    "intro": "For twenty years, Riverdale Community Center ran on word of mouth and Sunday announcements. The work was strong. The reach wasffddsdn't. This demo page shows how inline editing feels on a rddddddeal story layout."
+  },
+  "ctaButtons": {
+    "primary": "Explore the program",
+    "secondary": "Downloadddd the app"
+  },
+  "sections": {
+    "background": {
+      "heading": "Background",
+      "paragraphs": [
+        "Maria Santos didn't meet the board at a gala. She met them in the parking lot after a Saturday food drive, hauling boxes alongside volunteers who had been showing up for years. By the time any technology conversation happened, the trust was already there.",
+        "The center had been serving Riverdale for two decades. But community awareness had quietly narrowed. Families who used services three years ago didn't know about new evening classes. Donors who gave once couldn't find a path back in. Nobody made that decision intentionally — the channels just didn't follow people home."
+      ]
+    },
+    "challenge": {
+      "heading": "The Challenge",
+      "paragraphs": [
+        "Most community organizations run on three channels: word of mouth, partner announcements, and a website people visit only when they already know to look.",
+        "That's not a criticism. It's structural. Every channel requires someone to already be looking. A neighbor who heard the name once isn't looking. A parent who needs after-school programming isn't looking, because they don't know it exists."
+      ],
+      "callout": "None of those channels follow someone home.",
+      "afterStats": "The gap isn't motivation — it's presence. People live on their phones. Most community centers just aren't there yet in a way that feels owned, branded, and easy to update without calling a developer."
+    },
+    "approach": {
+      "heading": "Our Approach",
+      "paragraphs": [
+        "We built a branded mobile experience the center could run themselves: events, push updates, program listings, and volunteer sign-ups — managed in minutes, not sprint cycles.",
+        "What the community sees is Riverdale. Their colors, their programs, their voice. What staff get is something they can actually maintain without a computer science degree."
+      ]
+    },
+    "result": {
+      "heading": "The Result",
+      "paragraphs": [
+        "The pilot launched in six weeks. Early metrics are promising: repeat visits up, event sign-ups smoother, and staff spending less time answering the same questions by phone.",
+        "This is a demo story — but the editing experience is real. Toggle Inline Editor in the Astro toolbar and click any dashed field."
+      ]
+    },
+    "impact": {
+      "heading": "Why It Matters",
+      "paragraphs": [
+        "Most nonprofit leaders aren't short on mission. What's hard to find is a way to experiment without betting the annual budget on custom engineering.",
+        "Riverdale didn't have to. They got a credible digital front door and a team that could keep it current — for a fraction of what bespoke development would havefdsffdsa cost."
+      ]
+    }
+  },
+  "stats": [
+    {
+      "value": "3 in 4",
+      "label": "families said they learned about programs through a phone notification",
+      "source": "Pilot survey, n=120"
+    },
+    {
+      "value": "42%",
+      "label": "drop in phone inquiries about basic program info",
+      "source": "Q1 after launch"
+    },
+    {
+      "value": "6 wks",
+      "label": "from kickoff to App Store listing",
+      "source": "Project timeline"
+    }
+  ],
+  "quote": {
+    "text": "We stopped explaining the same schedule forty times a week. People just open the app — and we finally look like the organization we always were.",
+    "name": "Maria Santos",
+    "title": "Executive Director, Riverdale Community Center"
+  },
+  "footerCta": {
+    "title": "See it for yourself"
   }
 }

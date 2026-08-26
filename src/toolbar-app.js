@@ -8,12 +8,8 @@ export default defineToolbarApp({
     wrap.style.cssText = "display:flex;flex-direction:column;gap:10px;min-width:220px;padding:4px 0;";
 
     const status = document.createElement("p");
-    status.style.cssText = "margin:0;font-size:13px;color:var(--text-secondary,#888);line-height:1.4;";
+    status.style.cssText = "margin:0;font-size:13px;color:var(--text-secondary,#888);line-height:1.4;min-height:1.4em;";
     status.textContent = "Open a page with editable content.";
-
-    const fileEl = document.createElement("p");
-    fileEl.style.cssText = "margin:0;font-size:12px;color:var(--text-tertiary,#666);word-break:break-all;";
-    fileEl.hidden = true;
 
     const row = document.createElement("div");
     row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;";
@@ -26,19 +22,14 @@ export default defineToolbarApp({
       return btn;
     }
 
-    const saveBtn = makeBtn("Save", "green");
-    const cancelBtn = makeBtn("Cancel", "ghost");
-    saveBtn.hidden = true;
+    const cancelBtn = makeBtn("Discard", "ghost");
     cancelBtn.hidden = true;
 
     let pageReady = false;
     let appOpen = false;
-    let editing = false;
 
-    function setEditing(on) {
-      editing = on;
-      saveBtn.hidden = !on;
-      cancelBtn.hidden = !on;
+    function syncEditUi() {
+      cancelBtn.hidden = !window.__astro_inline_editor_editing;
     }
 
     function syncFromPage() {
@@ -48,44 +39,39 @@ export default defineToolbarApp({
 
       if (count > 0) {
         pageReady = true;
-        fileEl.hidden = false;
-        fileEl.textContent = state?.file || fields[0]?.getAttribute("data-edit-file") || "";
-        status.textContent = count + " editable field" + (count === 1 ? "" : "s");
+        if (!window.__astro_inline_editor_editing) {
+          status.textContent = count + " editable field" + (count === 1 ? "" : "s");
+        }
         return true;
       }
 
       pageReady = false;
-      fileEl.hidden = true;
       status.textContent = "No editable fields on this page.";
       return false;
     }
 
-    function tryEnterEdit() {
-      if (!appOpen || !pageReady || editing) return;
+    function startEditMode() {
+      if (!pageReady || window.__astro_inline_editor_editing) return;
       window.dispatchEvent(new CustomEvent(EVENT + ":enter"));
-      setEditing(true);
+      syncEditUi();
     }
 
     function onAppOpen() {
       appOpen = true;
       syncFromPage();
-      tryEnterEdit();
+      if (!window.__astro_inline_editor_editing) startEditMode();
+      else syncEditUi();
     }
 
     function onAppClose() {
       appOpen = false;
-      if (editing) {
-        window.dispatchEvent(new CustomEvent(EVENT + ":exit"));
-        setEditing(false);
+      if (window.__astro_inline_editor_editing) {
+        window.dispatchEvent(new CustomEvent(EVENT + ":done"));
       }
     }
 
-    saveBtn.addEventListener("click", () => {
-      window.dispatchEvent(new CustomEvent(EVENT + ":save"));
-    });
     cancelBtn.addEventListener("click", () => {
       window.dispatchEvent(new CustomEvent(EVENT + ":cancel"));
-      setEditing(false);
     });
 
     if (typeof app.onToggled === "function") {
@@ -100,49 +86,37 @@ export default defineToolbarApp({
 
     window.addEventListener(EVENT + ":ready", (e) => {
       syncFromPage();
-      if (e.detail?.file) fileEl.textContent = e.detail.file;
-      tryEnterEdit();
+      if (appOpen && !window.__astro_inline_editor_editing) startEditMode();
+      syncEditUi();
     });
 
     window.addEventListener(EVENT + ":absent", () => {
       pageReady = false;
-      setEditing(false);
       syncFromPage();
+      syncEditUi();
     });
 
     window.addEventListener(EVENT + ":status", (e) => {
       const d = e.detail || {};
-      if (d.message) status.textContent = d.message;
-      if (d.file) {
-        fileEl.hidden = false;
-        fileEl.textContent = d.file;
-      }
-      if (typeof d.editing === "boolean") setEditing(d.editing);
+      if (d.message !== undefined) status.textContent = d.message;
+      syncEditUi();
     });
 
     window.addEventListener("astro:before-preparation", () => {
       pageReady = false;
-      setEditing(false);
       status.textContent = "Loading…";
     });
 
     window.addEventListener("astro:page-load", () => {
       syncFromPage();
-      if (appOpen) tryEnterEdit();
+      syncEditUi();
     });
 
-    row.append(saveBtn, cancelBtn);
-    wrap.append(status, fileEl, row);
+    row.append(cancelBtn);
+    wrap.append(status, row);
     canvas.appendChild(wrap);
 
-    // Toolbar app init often runs after the page script emitted :ready — probe now.
     syncFromPage();
-  },
-
-  beforeTogglingOff() {
-    if (window.__astro_inline_editor_editing && window.__astro_inline_editor_dirty) {
-      return window.confirm("Discard unsaved inline edits?");
-    }
-    return true;
+    syncEditUi();
   },
 });
