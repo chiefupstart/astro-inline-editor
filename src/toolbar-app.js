@@ -3,7 +3,7 @@ import { defineToolbarApp } from "astro/toolbar";
 const EVENT = "astro-inline-editor";
 
 export default defineToolbarApp({
-  init(canvas, app) {
+  init(canvas, eventTarget) {
     const wrap = document.createElement("div");
     wrap.style.cssText = "display:flex;flex-direction:column;gap:10px;min-width:220px;padding:4px 0;";
 
@@ -74,10 +74,10 @@ export default defineToolbarApp({
       window.dispatchEvent(new CustomEvent(EVENT + ":cancel"));
     });
 
-    if (typeof app.onToggled === "function") {
-      app.onToggled(({ state }) => (state ? onAppOpen() : onAppClose()));
+    if (typeof eventTarget.onToggled === "function") {
+      eventTarget.onToggled(({ state }) => (state ? onAppOpen() : onAppClose()));
     } else {
-      app.addEventListener("app-toggled", (event) => {
+      eventTarget.addEventListener("app-toggled", (event) => {
         const state = event.detail?.state;
         if (state) onAppOpen();
         else onAppClose();

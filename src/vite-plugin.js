@@ -79,10 +79,15 @@ export function setupInlineEditorMiddleware(server, options = {}, logger = serve
   const excludeRoots = options.excludeRoots || [];
   const dataDir = options.dataDir || "src/data";
   const contentDir = options.contentDir || "src/content";
+  const contentExtraDirs = options.contentExtraDirs || [];
   const root = server.config.root;
   const publicDir = path.join(root, "public");
   const dataDirAbs = path.join(root, dataDir) + path.sep;
   const contentDirAbs = path.join(root, contentDir) + path.sep;
+  const contentDirAbsList = [
+    contentDirAbs,
+    ...contentExtraDirs.map((dir) => path.join(root, dir) + path.sep),
+  ];
 
   function isExcluded(pathname) {
     return excludeRoots.some((prefix) => pathname.startsWith(prefix));
@@ -107,8 +112,8 @@ export function setupInlineEditorMiddleware(server, options = {}, logger = serve
     }
     if (isMd) {
       const resolved = path.resolve(path.join(root, file));
-      if (!resolved.startsWith(contentDirAbs)) {
-        throw Object.assign(new Error(`path escapes ${contentDir}`), { status: 400 });
+      if (!contentDirAbsList.some((dir) => resolved.startsWith(dir))) {
+        throw Object.assign(new Error(`path escapes allowed markdown dirs`), { status: 400 });
       }
       return resolved;
     }
@@ -316,7 +321,7 @@ export function setupInlineEditorMiddleware(server, options = {}, logger = serve
         if (!storyFile || count === 0) {
           return sendBuffered(origWriteHead, origEnd, res, capturedStatus, body);
         }
-        const sourcePath = path.join(root, storyFile);
+        const sourcePath = path.resolve(root, storyFile);
         const sourceRaw = fs.readFileSync(sourcePath, "utf-8");
         const out = injectClient(html, storyFile, hashOf(sourceRaw), count);
         res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -335,6 +340,7 @@ export function setupInlineEditorMiddleware(server, options = {}, logger = serve
 export function inlineEditorVitePlugin(options = {}) {
   const dataDir = options.dataDir || "src/data";
   const contentDir = options.contentDir || "src/content";
+  const contentExtraDirs = options.contentExtraDirs || [];
 
   return {
     name: "astro-inline-editor",
@@ -343,9 +349,12 @@ export function inlineEditorVitePlugin(options = {}) {
     handleHotUpdate({ file, server }) {
       const root = server.config.root;
       const dataDirAbs = path.resolve(path.join(root, dataDir)) + path.sep;
-      const contentDirAbs = path.resolve(path.join(root, contentDir)) + path.sep;
+      const mdRoots = [
+        path.resolve(path.join(root, contentDir)) + path.sep,
+        ...contentExtraDirs.map((dir) => path.resolve(path.join(root, dir)) + path.sep),
+      ];
       if (file.startsWith(dataDirAbs) && file.endsWith(".json")) return [];
-      if (file.startsWith(contentDirAbs) && file.endsWith(".md")) return [];
+      if (file.endsWith(".md") && mdRoots.some((dir) => file.startsWith(dir))) return [];
     },
     configureServer(server) {
       setupInlineEditorMiddleware(server, options, server.config.logger);

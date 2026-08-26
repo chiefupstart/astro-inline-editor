@@ -30,9 +30,13 @@ function setAt(root, path, value) {
 }
 
 /** Split a .md file into YAML frontmatter and markdown body. */
-export function parseMdDocument(raw) {
+export function parseMdDocument(raw, { requireFrontmatter = true } = {}) {
   const match = raw.match(FRONTMATTER_RE);
   if (!match) {
+    if (!requireFrontmatter) {
+      const newline = raw.includes("\r\n") ? "\r\n" : "\n";
+      return { frontmatter: {}, body: raw, newline, hasFrontmatter: false };
+    }
     throw Object.assign(new Error("markdown file missing YAML frontmatter"), { status: 400 });
   }
   const newline = raw.includes("\r\n") ? "\r\n" : "\n";
@@ -40,10 +44,13 @@ export function parseMdDocument(raw) {
   if (!frontmatter || typeof frontmatter !== "object" || Array.isArray(frontmatter)) {
     throw Object.assign(new Error("frontmatter must be a YAML mapping"), { status: 400 });
   }
-  return { frontmatter, body: match[2], newline };
+  return { frontmatter, body: match[2], newline, hasFrontmatter: true };
 }
 
-export function serializeMdDocument({ frontmatter, body, newline = "\n" }) {
+export function serializeMdDocument({ frontmatter, body, newline = "\n", hasFrontmatter = true }) {
+  if (!hasFrontmatter) {
+    return body.endsWith("\n") || !body ? body : body + newline;
+  }
   const yamlStr = yaml.stringify(frontmatter).trimEnd();
   return `---${newline}${yamlStr}${newline}---${newline}${body}`;
 }
@@ -85,7 +92,7 @@ export function serializeBodySections(sections, newline = "\n") {
 }
 
 export function applyMdEdits(raw, edits) {
-  const doc = parseMdDocument(raw);
+  const doc = parseMdDocument(raw, { requireFrontmatter: FRONTMATTER_RE.test(raw) });
   const sections = parseBodySections(doc.body);
 
   for (const { path, text } of edits) {
