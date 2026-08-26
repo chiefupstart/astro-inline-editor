@@ -44,6 +44,22 @@ function displayMarkdownLinks(text) {
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
   );
 }
+
+function parseMarkdownImage(text) {
+  const match = text.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+  if (!match) return null;
+  let src = match[2];
+  if (src.startsWith("examples/basic/public/")) {
+    src = `/${src.slice("examples/basic/public/".length)}`;
+  }
+  return { alt: match[1], src };
+}
+
+function paragraphKind(paragraph) {
+  if (isCodeFence(paragraph)) return "code";
+  if (parseMarkdownImage(paragraph)) return "image";
+  return "text";
+}
 ---
 
 <html lang="en">
@@ -170,6 +186,18 @@ function displayMarkdownLinks(text) {
       }
       .prose li { margin-bottom: 0.35rem; }
       .prose .code-block { margin: 0 0 1rem; }
+      .readme-figure {
+        margin: 0 0 1rem;
+        padding: 0;
+      }
+      .readme-figure img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      }
       .edit-hint {
         margin-top: 2.5rem;
         padding: 1rem 1.25rem;
@@ -227,13 +255,24 @@ function displayMarkdownLinks(text) {
             <section>
               <h2 {...edit(`body.${sectionIndex}.heading`)}>{section.heading}</h2>
               {
-                section.paragraphs.map((paragraph, pi) =>
-                  isCodeFence(paragraph) ? (
-                    <pre class="code-block" {...edit(`body.${sectionIndex}.paragraphs.${pi}`)}><code>{codeFromFence(paragraph)}</code></pre>
-                  ) : (
-                    <p {...edit(`body.${sectionIndex}.paragraphs.${pi}`)}>{paragraph}</p>
-                  )
-                )
+                section.paragraphs.map((paragraph, pi) => {
+                  const editPath = `body.${sectionIndex}.paragraphs.${pi}`;
+                  const kind = paragraphKind(paragraph);
+                  if (kind === "code") {
+                    return (
+                      <pre class="code-block" {...edit(editPath)}><code>{codeFromFence(paragraph)}</code></pre>
+                    );
+                  }
+                  if (kind === "image") {
+                    const image = parseMarkdownImage(paragraph);
+                    return (
+                      <figure class="readme-figure" {...edit(editPath)}>
+                        <img src={image.src} alt={image.alt} loading="lazy" />
+                      </figure>
+                    );
+                  }
+                  return <p {...edit(editPath)}>{paragraph}</p>;
+                })
               }
             </section>
           );

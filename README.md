@@ -1,4 +1,4 @@
-Brought to you by UpStart Productions — we build fast websites, mobile apps, and digital tools for nonprofits and mission-driven organizations. Check out GrovLink, our mobile platform that gives nonprofits a fully custom, owned and branded mobile app without the $40,000 price tag.
+# astro-inline-editor
 
 *Brought to you by [UpStart Productions](https://heyupstart.com) — we build fast websites, mobile apps, and digital tools for nonprofits and mission-driven organizations. Check out [GrovLink](https://grovlink.com), our mobile platform that helps community networks connect people with local help, events, and resources.*
 
@@ -33,6 +33,10 @@ The last 5% is human: fix a typo, soften a headline, update a stat. You should n
 3. Click any tagged line of text, edit, click away — **saved**
 
 Production builds stay lean: the editor never ships to visitors. Only static HTML goes live.
+
+![Inline Editor on the Markdown example page — editable fields outlined in the browser](examples/basic/public/screenshots/inline-editor-demo.png)
+
+*Screenshot: the `/riverdale-year-two/` demo. Turn on Inline Editor in the Astro toolbar, click any outlined text, and changes save to the `.md` file.*
 
 ## Try it on this page
 
