@@ -25,6 +25,9 @@ export default function inlineEditor(options = {}) {
         updateConfig({
           vite: {
             plugins: [inlineEditorVitePlugin(options)],
+            optimizeDeps: {
+              include: ["astro/toolbar"],
+            },
           },
         });
 

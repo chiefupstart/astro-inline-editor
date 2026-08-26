@@ -2,6 +2,8 @@
 
 Dev-only inline content editor for Astro — edit tagged copy in the browser, save straight to JSON or static HTML. Opt-in via `contentEdit()`, localhost-only.
 
+On editable pages you'll see a **purple floating bar** (bottom-right) — that's the editor. The Astro dev toolbar pencil icon is optional; hover the **bottom edge** of the page if you don't see the Astro bar.
+
 ## Install
 
 ```bash
@@ -29,7 +31,7 @@ export default defineConfig({
 1. Put copy in JSON under `src/data/`
 2. Tag editable fields in your `.astro` templates
 3. Run `astro dev`
-4. Open **Inline Editor** in the Astro dev toolbar → **Edit content** → edit dashed fields → **Save**
+4. On editable pages, click **Edit content** in the **floating bar** (bottom-right). Optionally, the Astro dev toolbar also has an Inline Editor app (hover the bottom of the page to reveal the Astro bar).
 
 ### Tagging fields
 

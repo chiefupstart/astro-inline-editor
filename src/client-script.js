@@ -1,27 +1,50 @@
-// Injected into editable pages in dev. Controls live in the Astro dev toolbar;
-// this script handles contenteditable state and save requests.
+// Injected into editable pages in dev. Floating bar is always visible; Astro dev
+// toolbar app stays in sync via shared window events.
 
 const EVENT = "astro-inline-editor";
 
 export function clientScript({ file, hash, fieldCount }) {
+  if (fieldCount === 0) return "";
+
   return `
 <style>
+  #__ie_bar { position: fixed; bottom: 18px; right: 18px; z-index: 999999;
+    font: 13px -apple-system, Segoe UI, Arial, sans-serif; background: #262130;
+    color: #fff; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.28);
+    padding: 10px 12px; display: flex; gap: 8px; align-items: center; }
+  #__ie_bar button { font: inherit; border: none; border-radius: 6px; padding: 7px 12px;
+    cursor: pointer; font-weight: 600; }
+  #__ie_bar .primary { background: #6B4C8A; color: #fff; }
+  #__ie_bar .ghost { background: transparent; color: #cfc6db; }
+  #__ie_bar .ghost:hover { color: #fff; }
+  #__ie_status { color: #b9abcb; font-size: 12px; padding: 0 4px; max-width: 14rem; }
   [data-edit-id].__ie_on { outline: 1.5px dashed #B08BD1; outline-offset: 3px;
     border-radius: 2px; cursor: text; }
   [data-edit-id].__ie_on:hover { outline-color: #6B4C8A; background: rgba(107,76,138,0.06); }
   [data-edit-id].__ie_on:focus { outline: 1.5px solid #6B4C8A; background: rgba(107,76,138,0.10); }
   [data-edit-id].__ie_dirty { outline-style: solid; }
 </style>
+<div id="__ie_bar">
+  <span id="__ie_status"></span>
+  <button id="__ie_toggle" class="primary">Edit content</button>
+  <button id="__ie_save" class="primary" style="display:none">Save</button>
+  <button id="__ie_cancel" class="ghost" style="display:none">Cancel</button>
+</div>
 <script>
 (function () {
   var FILE = ${JSON.stringify(file)};
   var BASE_HASH = ${JSON.stringify(hash)};
   var FIELD_COUNT = ${fieldCount};
   var EVENT = ${JSON.stringify(EVENT)};
-  var IS_JSON = ${JSON.stringify(file.endsWith(".json"))};
   var editing = false;
   var originals = new Map();
   var dirty = new Map();
+
+  var bar = document.getElementById('__ie_bar');
+  var statusEl = document.getElementById('__ie_status');
+  var toggleBtn = document.getElementById('__ie_toggle');
+  var saveBtn = document.getElementById('__ie_save');
+  var cancelBtn = document.getElementById('__ie_cancel');
 
   function publishState() {
     window.__astro_inline_editor = {
@@ -31,6 +54,8 @@ export function clientScript({ file, hash, fieldCount }) {
       editing: editing,
       dirty: dirty.size,
     };
+    window.__astro_inline_editor_editing = editing;
+    window.__astro_inline_editor_dirty = dirty.size > 0;
   }
 
   function emit(type, detail) {
@@ -50,14 +75,18 @@ export function clientScript({ file, hash, fieldCount }) {
   }
 
   function statusMessage() {
-    if (!editing) return FIELD_COUNT + ' editable field' + (FIELD_COUNT === 1 ? '' : 's');
+    if (!editing) return '';
     if (dirty.size) return dirty.size + ' unsaved change' + (dirty.size === 1 ? '' : 's');
-    return 'Edit mode — click any dashed element';
+    return 'Click any dashed field to edit';
   }
 
-  function syncStatus() {
+  function syncBar() {
     publishState();
-    emit('status', { message: statusMessage(), editing: editing, dirty: dirty.size, file: FILE });
+    statusEl.textContent = statusMessage();
+    toggleBtn.style.display = editing ? 'none' : '';
+    saveBtn.style.display = editing ? '' : 'none';
+    cancelBtn.style.display = editing ? '' : 'none';
+    emit('status', { message: statusMessage() || (FIELD_COUNT + ' editable fields'), editing: editing, dirty: dirty.size, file: FILE });
   }
 
   function onInput(e) {
@@ -71,13 +100,12 @@ export function clientScript({ file, hash, fieldCount }) {
       dirty.delete(id);
       el.classList.remove('__ie_dirty');
     }
-    syncStatus();
+    syncBar();
   }
 
   function enterEdit() {
-    if (!FIELD_COUNT) return;
+    if (!FIELD_COUNT || editing) return;
     editing = true;
-    window.__astro_inline_editor_editing = true;
     dirty.clear();
     nodes().forEach(function (el) {
       var id = el.getAttribute('data-edit-id');
@@ -87,13 +115,11 @@ export function clientScript({ file, hash, fieldCount }) {
       el.addEventListener('paste', stripFormattingPaste);
       el.addEventListener('input', onInput);
     });
-    syncStatus();
+    syncBar();
   }
 
   function exitEdit(reload) {
     editing = false;
-    window.__astro_inline_editor_editing = false;
-    window.__astro_inline_editor_dirty = false;
     nodes().forEach(function (el) {
       el.removeAttribute('contenteditable');
       el.classList.remove('__ie_on', '__ie_dirty');
@@ -101,31 +127,28 @@ export function clientScript({ file, hash, fieldCount }) {
       el.removeEventListener('input', onInput);
     });
     if (reload) location.reload();
-    else syncStatus();
+    else syncBar();
   }
 
   function commitSaved(newHash) {
     if (newHash) BASE_HASH = newHash;
     nodes().forEach(function (el) {
-      var id = el.getAttribute('data-edit-id');
-      originals.set(id, currentValue(el));
+      originals.set(el.getAttribute('data-edit-id'), currentValue(el));
     });
     dirty.clear();
     exitEdit(false);
+    statusEl.textContent = 'Saved ✓';
     emit('status', { message: 'Saved ✓', editing: false, dirty: 0, file: FILE });
   }
 
   function saveEdits() {
     if (!dirty.size) { exitEdit(false); return; }
-    emit('status', { message: 'Saving…', editing: true, dirty: dirty.size, file: FILE });
+    statusEl.textContent = 'Saving…';
+    saveBtn.disabled = true;
     var edits = [];
     dirty.forEach(function (text, id) {
       var el = document.querySelector('[data-edit-id="' + CSS.escape(id) + '"]');
-      edits.push({
-        id: id,
-        text: text,
-        path: el ? el.getAttribute('data-edit-path') : undefined,
-      });
+      edits.push({ id: id, text: text, path: el ? el.getAttribute('data-edit-path') : undefined });
     });
     fetch('/__editor/save', {
       method: 'POST',
@@ -134,23 +157,29 @@ export function clientScript({ file, hash, fieldCount }) {
     })
       .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
       .then(function (res) {
+        saveBtn.disabled = false;
         if (!res.ok) {
-          emit('status', { message: 'Save failed', editing: true, dirty: dirty.size, file: FILE, error: res.body && res.body.message });
           alert('Save failed: ' + (res.body && res.body.message ? res.body.message : 'unknown error'));
+          syncBar();
           return;
         }
         if (res.body.reload) {
-          emit('status', { message: 'Saved — reloading…', editing: false, dirty: 0, file: FILE });
+          statusEl.textContent = 'Saved — reloading…';
           setTimeout(function () { location.reload(); }, 200);
           return;
         }
         commitSaved(res.body.hash);
       })
       .catch(function (err) {
-        emit('status', { message: 'Save failed', editing: true, dirty: dirty.size, file: FILE, error: err.message });
+        saveBtn.disabled = false;
         alert('Save failed: ' + err.message);
+        syncBar();
       });
   }
+
+  toggleBtn.addEventListener('click', enterEdit);
+  saveBtn.addEventListener('click', saveEdits);
+  cancelBtn.addEventListener('click', function () { exitEdit(true); });
 
   window.addEventListener(EVENT + ':enter', enterEdit);
   window.addEventListener(EVENT + ':save', saveEdits);
@@ -158,12 +187,8 @@ export function clientScript({ file, hash, fieldCount }) {
   window.addEventListener(EVENT + ':cancel', function () { exitEdit(true); });
 
   publishState();
-  if (FIELD_COUNT > 0) {
-    emit('ready', { file: FILE, fieldCount: FIELD_COUNT });
-    syncStatus();
-  } else {
-    emit('absent', {});
-  }
+  emit('ready', { file: FILE, fieldCount: FIELD_COUNT });
+  syncBar();
 })();
 </` + `script>
 `;
