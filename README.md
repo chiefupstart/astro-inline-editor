@@ -1,4 +1,6 @@
-# astro-inline-editor
+Brought to you by UpStart Productions — we build fast websites, mobile apps, and digital tools for nonprofits and mission-driven organizations. Check out GrovLink, our mobile platform that gives nonprofits a fully custom, owned and branded mobile app without the $40,000 price tag.
+
+*Brought to you by [UpStart Productions](https://heyupstart.com) — we build fast websites, mobile apps, and digital tools for nonprofits and mission-driven organizations. Check out [GrovLink](https://grovlink.com), our mobile platform that helps community networks connect people with local help, events, and resources.*
 
 You (or your AI assistant) built a nice Astro site. Now you need to change one headline — and you're burning tokens explaining which file to open, or hunting through folders for ten minutes.
 
@@ -34,13 +36,17 @@ Production builds stay lean: the editor never ships to visitors. Only static HTM
 
 ## Try it on this page
 
-You are looking at the package README rendered as a live demo.
+**Reading this on GitHub?** You're seeing the documentation — the links below won't open a live editor here. That's normal.
 
-- Turn on **Inline Editor** in the Astro dev toolbar
+**Want to actually click and edit?** Download or clone this repo, open the `examples/basic` folder, and run the site on your computer (`npm install`, then `npm run dev`). Open the local address it prints (usually `http://localhost:4321/`). *That's* when this README becomes a live, editable page.
+
+Once you're running locally:
+
+- Turn on **Inline Editor** in the Astro dev toolbar (hover the bottom edge of the page if the bar is hidden)
 - Click any paragraph or heading below to edit
-- Changes write back to `README.md` in the repo
+- Changes save back to this README file
 
-**More examples:** [JSON impact story](/riverdale/) · [Markdown + frontmatter](/riverdale-year-two/)
+**More examples** (same deal — local dev only): JSON impact story at `/riverdale/` · Markdown example at `/riverdale-year-two/`
 
 ## Install
 
@@ -66,10 +72,23 @@ export default defineConfig({
 });
 ```
 
+## AI assistant skills & rules
+
+You don't need to wire this up by hand. This package ships rules so Cursor, Claude Code, or similar tools set up editing for you:
+
+```bash
+mkdir -p .cursor/rules
+cp node_modules/astro-inline-editor/rules/inline-editor.mdc .cursor/rules/
+```
+
+For Claude Code and other agents, see `rules/AGENTS.md` in the package. **Skills** (step-by-step setup and migration guides for Cursor and Claude) are on the roadmap — the rules file is the starting point today.
+
+Tell your AI something like: *“Make the headlines on my About page editable using astro-inline-editor.”* Point it at those rules — it handles the technical wiring. You just edit text in the browser later.
+
 ## Usage
 
-1. Put copy in JSON (`src/data/`) or Markdown (`src/content/`)
-2. Tag editable fields in your `.astro` templates with `contentEdit()`
+1. **Let your AI set up the content files** — many Astro sites store page text in simple data files (JSON or Markdown). You don't write that by hand; your coding agent creates and connects them when it builds or updates the site.
+2. Tag editable fields in your `.astro` templates with `contentEdit()` — again, usually an AI task, not yours
 3. Run `astro dev`
 4. Toggle **Inline Editor** in the Astro dev toolbar and click text to edit
 
@@ -92,24 +111,11 @@ const edit = (path, html = false) => contentEdit(FILE, path, html);
 
 ### Tagging fields (Markdown)
 
-Use YAML frontmatter for structured fields (hero, stats, CTAs) and `##` headings in the body for prose sections. Tag paths like `body.0.heading` and `body.0.paragraphs.1`. See the [Markdown example](/riverdale-year-two/) for a full page.
+Use YAML frontmatter for structured fields (hero, stats, CTAs) and `##` headings in the body for prose sections. Tag paths like `body.0.heading` and `body.0.paragraphs.1`. See the Markdown example at `/riverdale-year-two/` when running the local demo.
 
 ### Static HTML
 
 Any `.html` file under `public/` gets editable text automatically in dev — no tagging required.
-
-## AI assistant skills & rules
-
-This package ships rules so your coding agent wires up editing correctly the first time:
-
-```bash
-mkdir -p .cursor/rules
-cp node_modules/astro-inline-editor/rules/inline-editor.mdc .cursor/rules/
-```
-
-For Claude Code and other agents, see `rules/AGENTS.md` in the package. **Skills** (step-by-step setup and migration guides for Cursor and Claude) are on the roadmap — the rules file is the starting point today.
-
-When you ask an AI to “make this headline editable,” point it at those rules so it uses `contentEdit()` instead of hard-coding copy in the template.
 
 ## How it works
 

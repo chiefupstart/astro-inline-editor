@@ -33,6 +33,17 @@ function codeFromFence(text) {
   const end = lines[lines.length - 1].trim() === "```" ? -1 : lines.length;
   return lines.slice(1, end).join("\n");
 }
+
+function displayMarkdownLinks(text) {
+  let t = text.trim();
+  if (t.startsWith("*") && t.endsWith("*") && !t.startsWith("**")) {
+    t = t.slice(1, -1);
+  }
+  return t.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+  );
+}
 ---
 
 <html lang="en">
@@ -42,23 +53,27 @@ function codeFromFence(text) {
     <title>{title}</title>
     <style>
       :root {
-        --charcoal: #2d2a32;
-        --muted: #6b7280;
-        --warm-light: #f5f2ed;
-        --accent: #6b4c8a;
-        --accent-dark: #3d2a54;
+        --charcoal: #2d2d2d;
+        --muted: #6b6b6b;
+        --warm: #fcfcfb;
+        --warm-light: #fefefd;
+        --warm-dark: #f9f9f7;
+        --border: #eaeaea;
+        --lime: #c4f547;
+        --link: #2563eb;
+        --link-hover: #1d4ed8;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         color: var(--charcoal);
-        background: var(--warm-light);
+        background: var(--warm);
         line-height: 1.65;
       }
       .site-header {
-        background: #fff;
-        border-bottom: 1px solid #e5e7eb;
+        background: var(--warm-light);
+        border-bottom: 1px solid #eaeaea;
         padding: 1rem 1.5rem;
         display: flex;
         flex-wrap: wrap;
@@ -67,14 +82,15 @@ function codeFromFence(text) {
         gap: 0.75rem;
         font-size: 0.875rem;
       }
-      .site-header strong { color: var(--accent); }
+      .site-header strong { color: var(--charcoal); }
       .site-header nav { display: flex; flex-wrap: wrap; gap: 1rem; }
       .site-header a { color: var(--muted); text-decoration: none; }
-      .site-header a:hover { color: var(--accent); }
+      .site-header a:hover { color: var(--charcoal); }
       .hero {
-        background: linear-gradient(135deg, var(--accent-dark) 0%, var(--accent) 100%);
-        color: #fff;
+        background: var(--warm-dark);
+        color: var(--charcoal);
         padding: 3rem 1.5rem 2.5rem;
+        border-bottom: 1px solid var(--border);
       }
       .hero-inner { max-width: 42rem; margin: 0 auto; }
       .hero h1 {
@@ -82,16 +98,31 @@ function codeFromFence(text) {
         font-size: clamp(1.75rem, 4vw, 2.5rem);
         line-height: 1.15;
         font-weight: 800;
+        letter-spacing: -0.02em;
       }
       .hero p {
         margin: 0 0 1rem;
         font-size: 1.0625rem;
-        opacity: 0.95;
+        color: #374151;
       }
       .hero p:last-child { margin-bottom: 0; }
+      .hero a,
+      .hero a:visited {
+        color: var(--link);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .hero a:hover { color: var(--link-hover); }
+      .hero-credit {
+        font-size: 0.9375rem;
+        color: var(--muted);
+        font-style: italic;
+        margin-bottom: 1.25rem;
+      }
       .format-badge {
         display: inline-block;
-        background: rgba(255,255,255,0.15);
+        background: var(--lime);
+        color: var(--charcoal);
         font-size: 0.75rem;
         font-weight: 600;
         padding: 0.25rem 0.6rem;
@@ -102,6 +133,7 @@ function codeFromFence(text) {
         max-width: 42rem;
         margin: 0 auto;
         padding: 2.5rem 1.5rem 4rem;
+        background: var(--warm-light);
       }
       .prose h2 {
         font-size: 1.375rem;
@@ -115,7 +147,12 @@ function codeFromFence(text) {
         margin: 0 0 1rem;
       }
       .prose strong { color: var(--charcoal); }
-      .prose a { color: var(--accent); }
+      .prose a {
+        color: var(--link);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .prose a:hover { color: var(--link-hover); }
       .prose pre {
         background: #1e1e2e;
         color: #cdd6f4;
@@ -136,7 +173,7 @@ function codeFromFence(text) {
       .edit-hint {
         margin-top: 2.5rem;
         padding: 1rem 1.25rem;
-        background: #fff;
+        background: var(--warm-dark);
         border: 1px dashed #d1d5db;
         border-radius: 0.5rem;
         font-size: 0.875rem;
@@ -157,15 +194,27 @@ function codeFromFence(text) {
     <header class="hero">
       <div class="hero-inner">
         <span class="format-badge">README.md · editable in dev</span>
-        <h1>{title}</h1>
+        <h1 {...edit("title")}>{title}</h1>
         {
-          intro?.paragraphs.map((paragraph, pi) =>
-            isCodeFence(paragraph) ? (
-              <pre class="code-block" {...edit(`body.0.paragraphs.${pi}`)}><code>{codeFromFence(paragraph)}</code></pre>
-            ) : (
-              <p {...edit(`body.0.paragraphs.${pi}`)}>{paragraph}</p>
-            )
-          )
+          intro?.paragraphs.map((paragraph, pi) => {
+            if (isCodeFence(paragraph)) {
+              return (
+                <pre class="code-block" {...edit(`body.0.paragraphs.${pi}`)}><code>{codeFromFence(paragraph)}</code></pre>
+              );
+            }
+            const isCredit = pi === 0 && paragraph.includes("](http");
+            if (isCredit) {
+              return (
+                <p
+                  {...edit(`body.0.paragraphs.${pi}`)}
+                  class="hero-credit"
+                  data-edit-raw={paragraph}
+                  set:html={displayMarkdownLinks(paragraph)}
+                />
+              );
+            }
+            return <p {...edit(`body.0.paragraphs.${pi}`)}>{paragraph}</p>;
+          })
         }
       </div>
     </header>

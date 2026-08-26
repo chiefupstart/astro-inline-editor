@@ -4,6 +4,19 @@ import { hashOf } from "./editor-core.js";
 export { hashOf };
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
+const TITLE_RE = /^# (.+)(?:\r?\n|$)/;
+
+function getMdTitle(body) {
+  const match = body.match(TITLE_RE);
+  return match ? match[1] : undefined;
+}
+
+function setMdTitle(body, title, newline = "\n") {
+  if (TITLE_RE.test(body)) {
+    return body.replace(TITLE_RE, `# ${title}${newline}`);
+  }
+  return `# ${title}${newline}${newline}${body}`;
+}
 
 function parsePath(path) {
   return path.split(".").map((part) => (/^\d+$/.test(part) ? Number(part) : part));
@@ -97,6 +110,14 @@ export function applyMdEdits(raw, edits) {
 
   for (const { path, text } of edits) {
     if (!path) throw Object.assign(new Error("missing path for markdown edit"), { status: 400 });
+
+    if (path === "title") {
+      if (getMdTitle(doc.body) === undefined) {
+        throw Object.assign(new Error("markdown file has no # title line"), { status: 400 });
+      }
+      doc.body = setMdTitle(doc.body, text, doc.newline);
+      continue;
+    }
 
     if (path.startsWith("body.")) {
       const subPath = path.slice(5);

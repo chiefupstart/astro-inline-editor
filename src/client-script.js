@@ -54,7 +54,23 @@ export function clientScript({ file, hash, fieldCount }) {
   }
 
   function currentValue(el) {
-    return el.hasAttribute('data-edit-html') ? el.innerHTML : el.textContent;
+    if (el.hasAttribute('data-edit-html')) return el.innerHTML;
+    if (el.hasAttribute('data-edit-raw')) return el.textContent;
+    return el.textContent;
+  }
+
+  function displayMarkdownLinks(text) {
+    var t = (text || '').trim();
+    if (t.charAt(0) === '*' && t.charAt(t.length - 1) === '*' && t.charAt(1) !== '*') {
+      t = t.slice(1, -1);
+    }
+    return t.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  }
+
+  function restoreMarkdownDisplay(el) {
+    if (!el.hasAttribute('data-edit-raw')) return;
+    var raw = el.getAttribute('data-edit-raw') || el.textContent || '';
+    el.innerHTML = displayMarkdownLinks(raw);
   }
 
   function statusMessage() {
@@ -125,6 +141,9 @@ export function clientScript({ file, hash, fieldCount }) {
     dirty.clear();
     nodes().forEach(function (el) {
       var id = el.getAttribute('data-edit-id');
+      if (el.hasAttribute('data-edit-raw')) {
+        el.textContent = el.getAttribute('data-edit-raw') || el.textContent || '';
+      }
       originals.set(id, currentValue(el));
       el.setAttribute('contenteditable', 'true');
       el.classList.add('__ie_on');
@@ -146,6 +165,7 @@ export function clientScript({ file, hash, fieldCount }) {
       el.removeEventListener('paste', stripFormattingPaste);
       el.removeEventListener('input', onInput);
       el.removeEventListener('blur', onBlur);
+      if (el.hasAttribute('data-edit-raw')) restoreMarkdownDisplay(el);
     });
     if (reload) location.reload();
     else syncState();
@@ -156,6 +176,10 @@ export function clientScript({ file, hash, fieldCount }) {
     nodes().forEach(function (el) {
       originals.set(el.getAttribute('data-edit-id'), currentValue(el));
       el.classList.remove('__ie_dirty');
+      if (el.hasAttribute('data-edit-raw')) {
+        el.setAttribute('data-edit-raw', currentValue(el));
+        restoreMarkdownDisplay(el);
+      }
     });
     dirty.clear();
     syncState();
