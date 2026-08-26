@@ -59,6 +59,61 @@ export function inlineEditorVitePlugin(options = {}) {
         );
       }
 
+      function resolveEditableFile(file) {
+        const isJson = file.endsWith(".json");
+        const isSrcHtml = file.startsWith("src/pages/") && file.endsWith(".html");
+        const isPublicHtml = !isJson && !isSrcHtml && file.endsWith(".html");
+
+        if (isJson) {
+          const resolved = path.resolve(path.join(root, file));
+          if (!resolved.startsWith(dataDirAbs)) {
+            throw Object.assign(new Error(`path escapes ${dataDir}`), { status: 400 });
+          }
+          return resolved;
+        }
+        if (isSrcHtml) {
+          const resolved = path.resolve(path.join(root, file));
+          if (!resolved.startsWith(path.join(root, "src", "pages") + path.sep)) {
+            throw Object.assign(new Error("path escapes src/pages"), { status: 400 });
+          }
+          return resolved;
+        }
+        if (isPublicHtml) {
+          const resolved = path.resolve(path.join(publicDir, file.replace(/^\/+/, "")));
+          if (!resolved.startsWith(publicDir + path.sep)) {
+            throw Object.assign(new Error("path escapes public dir"), { status: 400 });
+          }
+          return resolved;
+        }
+        throw Object.assign(new Error("unrecognized file type"), { status: 400 });
+      }
+
+      // --- Hash endpoint (refresh base hash after JSON save without reload) ---
+      server.middlewares.use((req, res, next) => {
+        const url = req.url || "";
+        if (req.method !== "GET" || !url.startsWith("/__editor/hash?")) return next();
+
+        const host = req.headers.host || "";
+        if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, message: "editor endpoint is localhost-only" }));
+          return;
+        }
+
+        try {
+          const file = new URL(url, "http://localhost").searchParams.get("file");
+          if (!file) throw Object.assign(new Error("missing file"), { status: 400 });
+          const resolved = resolveEditableFile(file);
+          if (!fs.existsSync(resolved)) throw Object.assign(new Error("file not found"), { status: 404 });
+          const raw = fs.readFileSync(resolved, "utf-8");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, hash: hashOf(raw) }));
+        } catch (e) {
+          res.writeHead(e.status || 500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, message: e.message }));
+        }
+      });
+
       // --- Save endpoint ---------------------------------------------------
       server.middlewares.use((req, res, next) => {
         if (req.method !== "POST" || req.url !== "/__editor/save") return next();
@@ -80,28 +135,7 @@ export function inlineEditorVitePlugin(options = {}) {
             }
 
             const isJson = file.endsWith(".json");
-            const isSrcHtml = file.startsWith("src/pages/") && file.endsWith(".html");
-            const isPublicHtml = !isJson && !isSrcHtml && file.endsWith(".html");
-
-            let resolved;
-            if (isJson) {
-              resolved = path.resolve(path.join(root, file));
-              if (!resolved.startsWith(dataDirAbs)) {
-                throw Object.assign(new Error(`path escapes ${dataDir}`), { status: 400 });
-              }
-            } else if (isSrcHtml) {
-              resolved = path.resolve(path.join(root, file));
-              if (!resolved.startsWith(path.join(root, "src", "pages") + path.sep)) {
-                throw Object.assign(new Error("path escapes src/pages"), { status: 400 });
-              }
-            } else if (isPublicHtml) {
-              resolved = path.resolve(path.join(publicDir, file.replace(/^\/+/, "")));
-              if (!resolved.startsWith(publicDir + path.sep)) {
-                throw Object.assign(new Error("path escapes public dir"), { status: 400 });
-              }
-            } else {
-              throw Object.assign(new Error("unrecognized file type"), { status: 400 });
-            }
+            const resolved = resolveEditableFile(file);
 
             if (!fs.existsSync(resolved)) {
               throw Object.assign(new Error("file not found"), { status: 404 });
@@ -135,10 +169,14 @@ export function inlineEditorVitePlugin(options = {}) {
 
             fs.writeFileSync(resolved, patched, "utf-8");
             server.config.logger.info(`[astro-inline-editor] saved ${edits.length} edit(s) to ${file}`);
-            // One clean reload from Vite (avoids racing client reload + JSON HMR).
-            if (server.ws) server.ws.send({ type: "full-reload" });
+
+            const newHash = hashOf(patched);
             res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ ok: true }));
+            res.end(JSON.stringify({
+              ok: true,
+              hash: newHash,
+              reload: !isJson,
+            }));
           } catch (e) {
             res.writeHead(e.status || 500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: false, message: e.message }));

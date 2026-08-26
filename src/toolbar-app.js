@@ -41,10 +41,43 @@ export default defineToolbarApp({
       cancelBtn.hidden = !on;
     }
 
+    function syncFromPage() {
+      const state = window.__astro_inline_editor;
+      const fields = document.querySelectorAll("[data-edit-id]");
+      const count = state?.fieldCount ?? fields.length;
+
+      if (count > 0) {
+        pageReady = true;
+        fileEl.hidden = false;
+        fileEl.textContent = state?.file || fields[0]?.getAttribute("data-edit-file") || "";
+        status.textContent = count + " editable field" + (count === 1 ? "" : "s");
+        return true;
+      }
+
+      pageReady = false;
+      fileEl.hidden = true;
+      status.textContent = "No editable fields on this page.";
+      return false;
+    }
+
     function tryEnterEdit() {
       if (!appOpen || !pageReady || editing) return;
       window.dispatchEvent(new CustomEvent(EVENT + ":enter"));
       setEditing(true);
+    }
+
+    function onAppOpen() {
+      appOpen = true;
+      syncFromPage();
+      tryEnterEdit();
+    }
+
+    function onAppClose() {
+      appOpen = false;
+      if (editing) {
+        window.dispatchEvent(new CustomEvent(EVENT + ":exit"));
+        setEditing(false);
+      }
     }
 
     saveBtn.addEventListener("click", () => {
@@ -55,29 +88,26 @@ export default defineToolbarApp({
       setEditing(false);
     });
 
-    app.onToggled(({ state }) => {
-      appOpen = state;
-      if (state) tryEnterEdit();
-      else if (editing) {
-        window.dispatchEvent(new CustomEvent(EVENT + ":cancel"));
-        setEditing(false);
-      }
-    });
+    if (typeof app.onToggled === "function") {
+      app.onToggled(({ state }) => (state ? onAppOpen() : onAppClose()));
+    } else {
+      app.addEventListener("app-toggled", (event) => {
+        const state = event.detail?.state;
+        if (state) onAppOpen();
+        else onAppClose();
+      });
+    }
 
     window.addEventListener(EVENT + ":ready", (e) => {
-      pageReady = true;
-      fileEl.hidden = false;
-      fileEl.textContent = e.detail.file;
-      status.textContent = e.detail.fieldCount + " editable field" + (e.detail.fieldCount === 1 ? "" : "s");
+      syncFromPage();
+      if (e.detail?.file) fileEl.textContent = e.detail.file;
       tryEnterEdit();
     });
 
     window.addEventListener(EVENT + ":absent", () => {
       pageReady = false;
-      editing = false;
       setEditing(false);
-      fileEl.hidden = true;
-      status.textContent = "No editable fields on this page.";
+      syncFromPage();
     });
 
     window.addEventListener(EVENT + ":status", (e) => {
@@ -93,13 +123,20 @@ export default defineToolbarApp({
     window.addEventListener("astro:before-preparation", () => {
       pageReady = false;
       setEditing(false);
-      fileEl.hidden = true;
       status.textContent = "Loading…";
+    });
+
+    window.addEventListener("astro:page-load", () => {
+      syncFromPage();
+      if (appOpen) tryEnterEdit();
     });
 
     row.append(saveBtn, cancelBtn);
     wrap.append(status, fileEl, row);
     canvas.appendChild(wrap);
+
+    // Toolbar app init often runs after the page script emitted :ready — probe now.
+    syncFromPage();
   },
 
   beforeTogglingOff() {

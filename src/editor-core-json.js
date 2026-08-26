@@ -1,5 +1,4 @@
 import { hashOf } from "./editor-core.js";
-import * as parse5 from "parse5";
 
 export { hashOf };
 
@@ -39,29 +38,26 @@ export function applyJsonEdits(raw, edits) {
   return JSON.stringify(data, null, 2) + "\n";
 }
 
-/** Tag elements that declare data-edit-file + data-edit-path for JSON-backed copy. */
+/**
+ * Add data-edit-id to tagged elements without re-serializing the document.
+ * Re-serializing via parse5 can disturb Astro dev-toolbar scripts.
+ */
 export function injectJsonEditIds(raw) {
-  const document = parse5.parse(raw);
-  const html = document.childNodes.find((n) => n.tagName === "html");
-  const body = html?.childNodes.find((n) => n.tagName === "body");
   let storyFile = null;
   let n = 0;
 
-  (function walk(node) {
-    if (!node.childNodes) return;
-    for (const child of node.childNodes) {
-      if (child.tagName) {
-        const file = child.attrs?.find((a) => a.name === "data-edit-file")?.value;
-        const path = child.attrs?.find((a) => a.name === "data-edit-path")?.value;
-        if (file && path) {
-          storyFile ??= file;
-          child.attrs = child.attrs.filter((a) => a.name !== "data-edit-id");
-          child.attrs.push({ name: "data-edit-id", value: `j${n++}` });
-        }
-      }
-      walk(child);
+  const html = raw.replace(/<([a-zA-Z][\w:-]*)(\s[^>]*?)>/g, (full, tagName, attrs) => {
+    if (!/data-edit-file="[^"]+"/.test(attrs) || !/data-edit-path="[^"]+"/.test(attrs)) {
+      return full;
     }
-  })(body ?? document);
+    if (/data-edit-id=/.test(attrs)) return full;
 
-  return { html: parse5.serialize(document), storyFile, count: n };
+    const fileMatch = attrs.match(/data-edit-file="([^"]+)"/);
+    if (fileMatch) storyFile ??= fileMatch[1];
+
+    const id = `j${n++}`;
+    return `<${tagName}${attrs} data-edit-id="${id}">`;
+  });
+
+  return { html, storyFile, count: n };
 }

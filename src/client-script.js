@@ -18,9 +18,20 @@ export function clientScript({ file, hash, fieldCount }) {
   var BASE_HASH = ${JSON.stringify(hash)};
   var FIELD_COUNT = ${fieldCount};
   var EVENT = ${JSON.stringify(EVENT)};
+  var IS_JSON = ${JSON.stringify(file.endsWith(".json"))};
   var editing = false;
   var originals = new Map();
   var dirty = new Map();
+
+  function publishState() {
+    window.__astro_inline_editor = {
+      file: FILE,
+      fieldCount: FIELD_COUNT,
+      hash: BASE_HASH,
+      editing: editing,
+      dirty: dirty.size,
+    };
+  }
 
   function emit(type, detail) {
     window.dispatchEvent(new CustomEvent(EVENT + ':' + type, { detail: detail || {} }));
@@ -45,7 +56,7 @@ export function clientScript({ file, hash, fieldCount }) {
   }
 
   function syncStatus() {
-    window.__astro_inline_editor_dirty = dirty.size > 0;
+    publishState();
     emit('status', { message: statusMessage(), editing: editing, dirty: dirty.size, file: FILE });
   }
 
@@ -93,6 +104,17 @@ export function clientScript({ file, hash, fieldCount }) {
     else syncStatus();
   }
 
+  function commitSaved(newHash) {
+    if (newHash) BASE_HASH = newHash;
+    nodes().forEach(function (el) {
+      var id = el.getAttribute('data-edit-id');
+      originals.set(id, currentValue(el));
+    });
+    dirty.clear();
+    exitEdit(false);
+    emit('status', { message: 'Saved ✓', editing: false, dirty: 0, file: FILE });
+  }
+
   function saveEdits() {
     if (!dirty.size) { exitEdit(false); return; }
     emit('status', { message: 'Saving…', editing: true, dirty: dirty.size, file: FILE });
@@ -117,8 +139,12 @@ export function clientScript({ file, hash, fieldCount }) {
           alert('Save failed: ' + (res.body && res.body.message ? res.body.message : 'unknown error'));
           return;
         }
-        emit('status', { message: 'Saved — reloading…', editing: false, dirty: 0, file: FILE });
-        // Vite full-reload is triggered server-side after save.
+        if (res.body.reload) {
+          emit('status', { message: 'Saved — reloading…', editing: false, dirty: 0, file: FILE });
+          setTimeout(function () { location.reload(); }, 200);
+          return;
+        }
+        commitSaved(res.body.hash);
       })
       .catch(function (err) {
         emit('status', { message: 'Save failed', editing: true, dirty: dirty.size, file: FILE, error: err.message });
@@ -128,8 +154,10 @@ export function clientScript({ file, hash, fieldCount }) {
 
   window.addEventListener(EVENT + ':enter', enterEdit);
   window.addEventListener(EVENT + ':save', saveEdits);
+  window.addEventListener(EVENT + ':exit', function () { exitEdit(false); });
   window.addEventListener(EVENT + ':cancel', function () { exitEdit(true); });
 
+  publishState();
   if (FIELD_COUNT > 0) {
     emit('ready', { file: FILE, fieldCount: FIELD_COUNT });
     syncStatus();
