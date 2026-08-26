@@ -1,0 +1,34 @@
+{
+  "name": "astro-inline-editor",
+  "version": "0.1.0",
+  "description": "Dev-only inline content editor for Astro — edit tagged copy in the browser, save straight to JSON or static HTML.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./content-edit": "./src/content-edit.js",
+    "./rules/*": "./rules/*"
+  },
+  "files": [
+    "src",
+    "rules",
+    "LICENSE",
+    "README.md"
+  ],
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "inline-editor",
+    "content-editing",
+    "dev-tools"
+  ],
+  "peerDependencies": {
+    "astro": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0"
+  },
+  "dependencies": {
+    "parse5": "^8.0.1"
+  },
+  "engines": {
+    "node": ">=18.14.1"
+  }
+}

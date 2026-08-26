@@ -1,0 +1,13 @@
+{
+  "name": "astro-inline-editor-example-basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build"
+  },
+  "dependencies": {
+    "astro": "^7.2.7",
+    "astro-inline-editor": "file:../.."
+  }
+}

@@ -1,0 +1,18 @@
+---
+import content from "../data/content.json";
+import { contentEdit } from "astro-inline-editor";
+
+const FILE = "src/data/content.json";
+const edit = (path) => contentEdit(FILE, path);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{content.meta.title}</title>
+  </head>
+  <body style="font-family: system-ui; max-width: 40rem; margin: 2rem auto; padding: 0 1rem;">
+    <h1 {...edit("hero.title")}>{content.hero.title}</h1>
+    <p {...edit("hero.intro")}>{content.hero.intro}</p>
+  </body>
+</html>

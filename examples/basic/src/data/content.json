@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "title": "Example | astro-inline-editor",
+    "description": "Minimal example page for the inline editor."
+  },
+  "hero": {
+    "title": "Hello, Inline Editor",
+    "intro": "Click Edit content in the Astro dev toolbar, then edit this text."
+  }
+}
