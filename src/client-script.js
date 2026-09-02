@@ -13,6 +13,7 @@ export function clientScript({ file, hash, fieldCount }) {
   [data-edit-id].__ie_on:hover { outline-color: #6B4C8A; background: rgba(107,76,138,0.06); }
   [data-edit-id].__ie_on:focus { outline: 1.5px solid #6B4C8A; background: rgba(107,76,138,0.10); }
   [data-edit-id].__ie_dirty { outline-style: solid; }
+  [data-edit-id][data-edit-html].__ie_on * { cursor: text; }
 </style>
 <script>
 (function () {
@@ -28,6 +29,18 @@ export function clientScript({ file, hash, fieldCount }) {
   var originals = new Map();
   var dirty = new Map();
   var guardedParents = [];
+  var EDIT_FLAG = "astro-inline-editor-active";
+
+  function markEditingActive(active) {
+    try {
+      if (active) sessionStorage.setItem(EDIT_FLAG, "1");
+      else sessionStorage.removeItem(EDIT_FLAG);
+    } catch (e) {}
+  }
+
+  function shouldRestoreEditMode() {
+    try { return sessionStorage.getItem(EDIT_FLAG) === "1"; } catch (e) { return false; }
+  }
 
   function publishState() {
     window.__astro_inline_editor = {
@@ -135,9 +148,33 @@ export function clientScript({ file, hash, fieldCount }) {
     guardedParents = [];
   }
 
+  function focusHtmlField(el, e) {
+    if (e.target === el) return;
+    e.preventDefault();
+    el.focus();
+    var sel = window.getSelection();
+    if (!sel) return;
+    var range = null;
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(e.clientX, e.clientY);
+    } else if (document.caretPositionFromPoint) {
+      var pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+    if (range) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+
   function enterEdit() {
     if (!FIELD_COUNT || editing) return;
     editing = true;
+    markEditingActive(true);
     dirty.clear();
     nodes().forEach(function (el) {
       var id = el.getAttribute('data-edit-id');
@@ -150,6 +187,10 @@ export function clientScript({ file, hash, fieldCount }) {
       el.addEventListener('paste', stripFormattingPaste);
       el.addEventListener('input', onInput);
       el.addEventListener('blur', onBlur);
+      if (el.hasAttribute('data-edit-html')) {
+        el.__ie_htmlDown = function (e) { focusHtmlField(el, e); };
+        el.addEventListener('mousedown', el.__ie_htmlDown);
+      }
       guardInteractiveParents(el);
     });
     syncState();
@@ -158,6 +199,7 @@ export function clientScript({ file, hash, fieldCount }) {
   function exitEdit(reload) {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     editing = false;
+    markEditingActive(false);
     unguardInteractiveParents();
     nodes().forEach(function (el) {
       el.removeAttribute('contenteditable');
@@ -165,6 +207,10 @@ export function clientScript({ file, hash, fieldCount }) {
       el.removeEventListener('paste', stripFormattingPaste);
       el.removeEventListener('input', onInput);
       el.removeEventListener('blur', onBlur);
+      if (el.__ie_htmlDown) {
+        el.removeEventListener('mousedown', el.__ie_htmlDown);
+        delete el.__ie_htmlDown;
+      }
       if (el.hasAttribute('data-edit-raw')) restoreMarkdownDisplay(el);
     });
     if (reload) location.reload();
@@ -221,10 +267,12 @@ export function clientScript({ file, hash, fieldCount }) {
           return;
         }
         if (res.body.reload) {
+          markEditingActive(true);
           setTimeout(function () { location.reload(); }, 200);
           return;
         }
         applySaved(res.body.hash);
+        emit('status', { message: 'Saved ✓', editing: editing, dirty: 0, file: FILE });
 
         if (pendingSave) {
           pendingSave = false;
@@ -249,12 +297,22 @@ export function clientScript({ file, hash, fieldCount }) {
 
   window.addEventListener(EVENT + ':enter', enterEdit);
   window.addEventListener(EVENT + ':save', function () { saveEdits(); });
-  window.addEventListener(EVENT + ':done', function () { saveEdits({ exitAfter: true }); });
+  window.addEventListener(EVENT + ':exit', function () { saveEdits({ exitAfter: true }); });
   window.addEventListener(EVENT + ':cancel', function () { exitEdit(true); });
+
+  window.addEventListener('astro:page-load', function () {
+    if (shouldRestoreEditMode() && !editing) enterEdit();
+  });
 
   publishState();
   emit('ready', { file: FILE, fieldCount: FIELD_COUNT });
   syncState();
+
+  if (shouldRestoreEditMode()) {
+    requestAnimationFrame(function () {
+      if (!editing) enterEdit();
+    });
+  }
 })();
 </` + `script>
 `;

@@ -39,9 +39,7 @@ export default defineToolbarApp({
 
       if (count > 0) {
         pageReady = true;
-        if (!window.__astro_inline_editor_editing) {
-          status.textContent = count + " editable field" + (count === 1 ? "" : "s");
-        }
+        status.textContent = count + " editable field" + (count === 1 ? "" : "s");
         return true;
       }
 
@@ -66,7 +64,7 @@ export default defineToolbarApp({
     function onAppClose() {
       appOpen = false;
       if (window.__astro_inline_editor_editing) {
-        window.dispatchEvent(new CustomEvent(EVENT + ":done"));
+        window.dispatchEvent(new CustomEvent(EVENT + ":exit"));
       }
     }
 
@@ -84,7 +82,7 @@ export default defineToolbarApp({
       });
     }
 
-    window.addEventListener(EVENT + ":ready", (e) => {
+    window.addEventListener(EVENT + ":ready", () => {
       syncFromPage();
       if (appOpen && !window.__astro_inline_editor_editing) startEditMode();
       syncEditUi();
@@ -98,7 +96,11 @@ export default defineToolbarApp({
 
     window.addEventListener(EVENT + ":status", (e) => {
       const d = e.detail || {};
-      if (d.message !== undefined) status.textContent = d.message;
+      if (d.message !== undefined && d.message !== "") {
+        status.textContent = d.message;
+      } else {
+        syncFromPage();
+      }
       syncEditUi();
     });
 

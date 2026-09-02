@@ -51,6 +51,42 @@ function resolvePageSource(root, pathname) {
   return null;
 }
 
+/** Resolve public/foo/index.html for directory URLs like /demos/tpn-maudes/ */
+function resolvePublicHtmlFile(publicDir, pathname) {
+  let rel = pathname.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!rel) rel = "index.html";
+  else if (!rel.endsWith(".html")) rel = path.join(rel, "index.html");
+  const file = path.join(publicDir, rel);
+  return fs.existsSync(file) ? file : null;
+}
+
+function readAstroVersion(root) {
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(root, "node_modules/astro/package.json"), "utf-8")
+    );
+    return pkg.version || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/** Static HTML under public/ is not Astro-rendered — inject dev toolbar scripts manually. */
+function injectDevToolbar(html, root) {
+  if (html.includes("dev-toolbar/entrypoint")) return html;
+  const version = readAstroVersion(root);
+  const config = JSON.stringify({
+    root,
+    version,
+    debugInfo: `Astro                    v${version}\nStatic HTML (public/) · astro-inline-editor`,
+  });
+  const snippet =
+    `<script type="module" src="/@vite/client"></script>` +
+    `<script type="module" src="/@id/astro/runtime/client/dev-toolbar/entrypoint.js"></script>` +
+    `<script>window.__astro_dev_toolbar__ = ${config}</script>`;
+  return html.includes("</head>") ? html.replace("</head>", snippet + "</head>") : snippet + html;
+}
+
 function sendBuffered(origWriteHead, origEnd, res, status, body) {
   res.removeHeader("transfer-encoding");
   if (body.length > 0) {
@@ -224,7 +260,7 @@ export function setupInlineEditorMiddleware(server, options = {}, logger = serve
         res.end(JSON.stringify({
           ok: true,
           hash: newHash,
-          reload: !isJson && !isMd,
+          reload: false,
         }));
       } catch (e) {
         res.writeHead(e.status || 500, { "Content-Type": "application/json" });
@@ -238,8 +274,8 @@ export function setupInlineEditorMiddleware(server, options = {}, logger = serve
     const pathname = (req.url || "").split("?")[0];
     if (!isPageNavigation(req, pathname, isExcluded)) return next();
 
-    const publicFile = path.join(publicDir, pathname.replace(/^\/+/, ""));
-    const isStaticHtml = pathname.endsWith(".html") && fs.existsSync(publicFile);
+    const publicHtmlFile = resolvePublicHtmlFile(publicDir, pathname);
+    const isStaticHtml = publicHtmlFile !== null;
     const srcHtmlFile = !isStaticHtml ? resolvePageSource(root, pathname) : null;
 
     const chunks = [];
@@ -284,10 +320,11 @@ export function setupInlineEditorMiddleware(server, options = {}, logger = serve
       // Static HTML under public/
       if (isStaticHtml) {
         try {
-          const sourceRaw = fs.readFileSync(publicFile, "utf-8");
+          const sourceRaw = fs.readFileSync(publicHtmlFile, "utf-8");
           const { html } = injectIds(renderedRaw);
-          const relFile = path.relative(publicDir, publicFile);
-          const out = injectClient(html, relFile, hashOf(sourceRaw), countEditIds(html));
+          const relFile = path.relative(publicDir, publicHtmlFile);
+          let out = injectClient(html, relFile, hashOf(sourceRaw), countEditIds(html));
+          out = injectDevToolbar(out, root);
           res.setHeader("Content-Type", "text/html; charset=utf-8");
           return sendBuffered(origWriteHead, origEnd, res, 200, Buffer.from(out));
         } catch (e) {
@@ -302,7 +339,8 @@ export function setupInlineEditorMiddleware(server, options = {}, logger = serve
           const sourceRaw = fs.readFileSync(srcHtmlFile, "utf-8");
           const relSource = path.relative(root, srcHtmlFile);
           const { html } = injectIds(renderedRaw);
-          const out = injectClient(html, relSource, hashOf(sourceRaw), countEditIds(html));
+          let out = injectClient(html, relSource, hashOf(sourceRaw), countEditIds(html));
+          out = injectDevToolbar(out, root);
           res.setHeader("Content-Type", "text/html; charset=utf-8");
           return sendBuffered(origWriteHead, origEnd, res, 200, Buffer.from(out));
         } catch (e) {
@@ -348,6 +386,8 @@ export function inlineEditorVitePlugin(options = {}) {
     /** Saving content files must not HMR-refresh the page — that strips edit mode mid-session. */
     handleHotUpdate({ file, server }) {
       const root = server.config.root;
+      const publicDirAbs = path.resolve(path.join(root, "public")) + path.sep;
+      const pagesDirAbs = path.resolve(path.join(root, "src", "pages")) + path.sep;
       const dataDirAbs = path.resolve(path.join(root, dataDir)) + path.sep;
       const mdRoots = [
         path.resolve(path.join(root, contentDir)) + path.sep,
@@ -355,6 +395,9 @@ export function inlineEditorVitePlugin(options = {}) {
       ];
       if (file.startsWith(dataDirAbs) && file.endsWith(".json")) return [];
       if (file.endsWith(".md") && mdRoots.some((dir) => file.startsWith(dir))) return [];
+      if (file.endsWith(".html") && (file.startsWith(publicDirAbs) || file.startsWith(pagesDirAbs))) {
+        return [];
+      }
     },
     configureServer(server) {
       setupInlineEditorMiddleware(server, options, server.config.logger);
