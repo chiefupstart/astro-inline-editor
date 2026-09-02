@@ -1,6 +1,6 @@
 {
   "name": "@heyupstart/astro-inline-editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Dev-only inline content editor for Astro — edit tagged copy in the browser, save straight to JSON or static HTML.",
   "license": "MIT",
   "type": "module",
